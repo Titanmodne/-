@@ -1,9 +1,9 @@
 import math
-import ezdxf
+import ezdxf 
 import ezdxf.entities
 import matplotlib.pyplot as plt
-import numpy as np
-import cvxpy as cp
+import numpy as np 
+import cvxpy as cp 
 import sympy
 
 
@@ -19,101 +19,101 @@ class Line:
             self.end = tuple(end)
 
 class Arc:
-    def __init__(self, e: ezdxf.entities.Arc) -> None:
+    def __init__(self, e: ezdxf.entities.Arc) -> None: 
         self.dxftype = 'ARC'
         self.center = e.dxf.center
-        self.start_angle = e.dxf.start_angle
+        self.start_angle = e.dxf.start_angle 
         self.end_angle = e.dxf.end_angle
         self.radius = e.dxf.radius
         self.start = e.start_point
         self.end = e.end_point
 
-    def __init__(self, e: ezdxf.entities.Ellipse) -> None:
+    def __init__(self, e: ezdxf.entities.Ellipse) -> None: 
         self.dxftype = 'ELLIPSE'
         self.center = e.dxf.center
-        self.major_axis = e.dxf.major_axis
+        self.major_axis = e.dxf.major_axis 
         self.ratio = e.dxf.ratio
         self.start_param = e.dxf.start_param
-        self.end_param = e.dxf.end_param
+        self.end_param = e.dxf.end_param 
         self.start = e.start_point
-        self.end = e.end_point
+        self.end = e.end_point 
         self.minor_axis = e.minor_axis
 
 class Euler:
-    def __init__(self) -> None:
+    def __init__(self) -> None: 
         self.pointList = []
-        self.pointCount = 0
-        self.pointDegree = []
+        self.pointCount = 0 
+        self.pointDegree = [] 
         self.edges = []
-        self.graph = None
-        self.graphWeight = None
-        self.edgeDouble = []
+        self.graph = None 
+        self.graphWeight = None 
+        self.edgeDouble = [] 
         self.floydPath = None
         self.xMax = 0
         self.yMax = 0
-        self.inf = 10000
+        self.inf = 10000 
         self.delta = 1 # 重边偏移量
         self.delta2 = 1 # 立马返回时的延长量
         self.startPoint = None
 
-    def getPointIndex(self, point):
+    def getPointIndex(self, point): 
         for i in range(len(self.pointList)):
             if self.isSamePoint(self.pointList[i], point):
                 self.pointDegree[i] += 1
-                return i
+                return i 
         i = len(self.pointList)
-        self.pointList.append(point)
-        self.pointDegree.append(1)
+        self.pointList.append(point) 
+        self.pointDegree.append(1) 
         return i
+    
 
-
-    def isSamePoint(self, p1, p2):
+    def isSamePoint(self, p1, p2): 
         for i in range(3):
-            if abs(p1[i]-p2[i]) > 0.1:
-                return False
+            if abs(p1[i]-p2[i]) > 0.1: 
+                return False  
         return True
 
 
     def optGraph(self, graph):
-        graph2 = [[None]*self.pointCount for i in range(self.pointCount)]
+        graph2 = [[None]*self.pointCount for i in range(self.pointCount)] 
         for i in range(self.pointCount):
-            for j in range(self.pointCount):
+            for j in range(self.pointCount): 
                 graph2[i][j] = graph[i][j]
-        return graph2
-
+        return graph2    
+    
 
     def weightGraph(self):
-        graphWeight = [[-1]*self.pointCount for i in range(self.pointCount)]
+        graphWeight = [[-1]*self.pointCount for i in range(self.pointCount)] 
         for i in range(self.pointCount):
-            for j in range(self.pointCount):
-                weight = -1
+            for j in range(self.pointCount): 
+                weight = -1 
                 e = self.graph[i][j]
                 if e == None:
-                    continue
-                if e.dxftype == 'LINE':
-                    weight = math.sqrt((e.start[0]-e.end[0]) ** 2+(e.start[1]-e.end[1])**2)
+                    continue 
+                if e.dxftype == 'LINE': 
+                    weight = math.sqrt((e.start[0]-e.end[0]) ** 2+(e.start[1]-e.end[1])**2) 
                 else:
-                    weight = self.inf
+                    weight = self.inf 
                 graphWeight[i][j] = weight
         return graphWeight
-
+    
 
     def floyd(self):
-        g = self.graphWeight
+        g = self.graphWeight 
         l = len(g)
-        self.floydPath = [[i for i in range(self.pointCount)] for i in range(self.pointCount)]
+        self.floydPath = [[i for i in range(self.pointCount)] for i in range(self.pointCount)] 
         for k in range(l):
             for i in range(l):
                 for j in range(l):
                     if i == j:
-                        continue
+                        continue 
                     if g[i][k] != -1 and g[k][j] != -1:
                         if g[i][j] == -1 or g[i][j] > g[i][k]+g[k][j]:
                             g[i][j] = g[i][k]+g[k][j]
                             self.floydPath[i][j] = self.floydPath[i][k]
 
 
-    def getCost(self, oddList: list):
+    def getCost(self, oddList: list):   
         l = len(oddList)
         oddGraph = np.zeros((l, l))
         for i in range(l):
@@ -123,29 +123,29 @@ class Euler:
             else:
                 oddGraph[i][j] = self.graphWeight[oddList[i]][oddList[j]]
         return self.cvx2(oddGraph)
-
+    
 
     def cvx2(self, c):
         """ 返回最优值 """
         n = len(c)
-        x = cp.Variable((n, n), integer=True)
+        x = cp.Variable((n, n), integer=True) 
         obj = cp.Minimize(cp.sum(cp.multiply(c, x)))
-        con = [0 <= x, x <= 1, cp.sum(x, axis=0, keepdims=True) == 1, cp.sum(x, axis=1, keepdims=True) == 1, x == cp.transpose(x)]
-        prob = cp.Problem(obj, con)
-        prob.solve(solver='GLPK_MI')
-        #print("最优值为", prob.value)
-        return prob.value
-
+        con = [0 <= x, x <= 1, cp.sum(x, axis=0, keepdims=True) == 1, cp.sum(x, axis=1, keepdims=True) == 1, x == cp.transpose(x)] 
+        prob = cp.Problem(obj, con) 
+        prob.solve(solver='GLPK_MI') 
+        #print("最优值为", prob.value) 
+        return prob.value 
+    
 
     def cvx(self, c) -> set:
         """ 返回最优解 """
         n = len(c)
-        x = cp.Variable((n, n), integer=True)
+        x = cp.Variable((n, n), integer=True) 
         obj = cp.Minimize(cp.sum(cp.multiply(c, x)))
-        con = [0 <= x, x <= 1, cp.sum(x, axis=0, keepdims=True) == 1, cp.sum(x, axis=1, keepdims=True) == 1, x == cp.transpose(x)]
-        prob = cp.Problem(obj, con)
-        prob.solve(solver='GLPK_MI')
-        #print("最优值为", prob.value)
+        con = [0 <= x, x <= 1, cp.sum(x, axis=0, keepdims=True) == 1, cp.sum(x, axis=1, keepdims=True) == 1, x == cp.transpose(x)] 
+        prob = cp.Problem(obj, con) 
+        prob.solve(solver='GLPK_MI') 
+        #print("最优值为", prob.value) 
         # print("最优解为：", x.value)
         sol = x.value
         edges = set()
@@ -159,7 +159,7 @@ class Euler:
                 j += 1
             i += 1
         return edges
-
+    
     def pointClosestToOrigin(self):
         """ 离原点最近的点的索引 """
         minDis = self.inf
@@ -235,7 +235,7 @@ class Euler:
             if costList[i] == minCost:
                 seListBest.append(seList[i])
         return seListBest
-
+    
 
     def addEdge(self, oddList):
         l = len(oddList)
@@ -285,6 +285,7 @@ class Euler:
 
     def getBestPath(self, seListBest):
         for se in seListBest:
+            oddList = []
             pd = list(self.pointDegree)
             startPointIndex = se[0]
             endPointIndex = se[1]
@@ -316,7 +317,7 @@ class Euler:
                 path.reverse()
                 return path
         raise Exception("规划路径失败，请重新指定起点终点!")
-
+    
 
     def move(self, start, end, direction: bool):
         start = list(start)
@@ -343,8 +344,8 @@ class Euler:
             start[1] += d*math.sin(theta)
             end[0] += d*math.cos(theta)
             end[1] += d*math.sin(theta)
-        return start, end
-
+        return start, end    
+    
 
     def reshapeEntities(self, path: list) -> list:
         drawed = set()
@@ -450,7 +451,7 @@ class Euler:
                 # 不是直线，直接加入
                 entityList.append(e)
             i += 1
-        return entityList
+        return entityList     
 
 
 
