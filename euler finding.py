@@ -1,7 +1,7 @@
-from collections import defaultdict
+from collections import defaultdict, deque
 
 
-# 构建图，使用邻接表表示
+# 构建图的邻接表
 def build_graph(edges):
     graph = defaultdict(list)
     for u, v in edges:
@@ -10,130 +10,84 @@ def build_graph(edges):
     return graph
 
 
-# 检查图中所有节点的度数
-def get_degrees(graph):
-    degrees = defaultdict(int)
-    for u in graph:
-        degrees[u] = len(graph[u])
-    return degrees
+# 寻找度数为奇数的顶点
+def find_odd_degree_vertices(graph):
+    odd_vertices = []
+    for vertex in graph:
+        if len(graph[vertex]) % 2 != 0:
+            odd_vertices.append(vertex)
+    return odd_vertices
 
 
-# 找到奇数度数的节点
-def find_odd_vertices(degrees):
-    return [v for v, degree in degrees.items() if degree % 2 == 1]
+# 复制并反转边以使图满足欧拉路径的条件
+def make_eulerian(graph, edges):
+    odd_vertices = find_odd_degree_vertices(graph)
+    while len(odd_vertices) > 0:
+        v1 = odd_vertices.pop()
+        v2 = odd_vertices.pop()
+        graph[v1].append(v2)
+        graph[v2].append(v1)
+        edges.append((v1, v2))  # 复制并添加反转的边
+    return graph
 
 
-# 检查图是否连通
-def is_connected(graph):
-    if not graph:
-        return True
+# 使用Fleury算法生成欧拉路径
+def eulerian_path(graph):
+    start_vertex = next(iter(graph))
+    stack = [start_vertex]
+    path = deque()
 
-    visited = set()
-    start_node = next(iter(graph))
+    while stack:
+        vertex = stack[-1]
+        if graph[vertex]:
+            next_vertex = graph[vertex].pop()
+            graph[next_vertex].remove(vertex)
+            stack.append(next_vertex)
+        else:
+            path.appendleft(stack.pop())
 
-    def dfs(v):
-        visited.add(v)
-        for neighbor in graph[v]:
-            if neighbor not in visited:
-                dfs(neighbor)
-
-    dfs(start_node)
-    return len(visited) == len(graph)
-
-
-# 使用 Fleury 算法生成欧拉回路或路径
-def fleury_algorithm(graph, start):
-    graph = {u: list(vs) for u, vs in graph.items()}  # 复制图，避免修改原图
-    path = []
-
-    def is_bridge(u, v):
-        # 暂时移除边(u, v)和(v, u)来检查是否是桥
-        graph[u].remove(v)
-        graph[v].remove(u)
-        is_conn = is_connected(graph)
-        graph[u].append(v)
-        graph[v].append(u)
-        return not is_conn
-
-    def find_eulerian_path(u):
-        stack = [u]
-        path = []
-        while stack:
-            u = stack[-1]
-            if graph[u]:
-                v = graph[u][0]
-                if is_bridge(u, v) and len(graph[u]) > 1:
-                    # 找到非桥的边来避免无效路径
-                    for neighbor in graph[u]:
-                        if neighbor != v:
-                            v = neighbor
-                            break
-                path.append((u, v))
-                graph[u].remove(v)
-                graph[v].remove(u)
-                stack.append(v)
-            else:
-                stack.pop()
-                if stack:
-                    path.append((stack[-1], u))
-        return path
-
-    return find_eulerian_path(start)
-
-
-def main(edges):
-    graph = build_graph(edges)
-    degrees = get_degrees(graph)
-    odd_vertices = find_odd_vertices(degrees)
-
-    if not is_connected(graph):
-        raise ValueError("图的一个或多个节点的度数为0，无法生成欧拉路径或回路")
-
-    start = next(iter(graph))
-    if len(odd_vertices) == 2:
-        start = odd_vertices[0]
-
-    eulerian_path = fleury_algorithm(graph, start)
-
-    # 处理并去除重复的反向边
-    seen_edges = set()
-    path_with_reverse = []
-    for u, v in eulerian_path:
-        if (u, v) not in seen_edges and (v, u) not in seen_edges:
-            path_with_reverse.append((u, v))
-            seen_edges.add((u, v))
-            seen_edges.add((v, u))  # 添加反向边
-
-    return path_with_reverse
+    return list(path)
 
 
 # 输入边列表
 edges = [
     ((10.0, 0.0), (10.0, 4.79)),
     ((10.0, 4.79), (10.0, 8.0)),
-    ((7.85, 8.0), (10.0, 8.0)),
-    ((4.15, 8.0), (7.85, 8.0)),
-    ((0.0, 8.0), (4.15, 8.0)),
-    ((0.0, 4.79), (0.0, 8.0)),
-    ((0.0, 0.0), (0.0, 4.79)),
-    ((0.0, 0.0), (3.23, 0.0)),
-    ((3.23, 0.0), (8.77, 0.0)),
-    ((8.77, 0.0), (10.0, 0.0)),
-    ((0.0, 4.79), (3.0, 4.79)),
-    ((3.0, 4.79), (4.5, 2.2)),
-    ((3.23, 0.0), (4.5, 2.2)),
-    ((4.15, 8.0), (4.5, 7.39)),
-    ((3.0, 4.79), (4.5, 7.39)),
-    ((4.5, 2.2), (7.5, 2.2)),
-    ((7.5, 2.2), (8.77, 0.0)),
-    ((4.5, 7.39), (7.5, 7.39)),
+    ((10.0, 8.0), (7.85, 8.0)),
+    ((7.85, 8.0), (7.5, 7.39)),
     ((7.5, 7.39), (9.0, 4.79)),
-    ((7.5, 2.2), (9.0, 4.79)),
-    ((7.5, 7.39), (7.85, 8.0)),
     ((9.0, 4.79), (10.0, 4.79)),
+    ((9.0, 4.79), (7.5, 2.2)),
+    ((7.5, 2.2), (8.77, 0.0)),
+    ((8.77, 0.0), (10.0, 0.0)),
+    ((8.77, 0.0), (3.23, 0.0)),
+    ((3.23, 0.0), (4.5, 2.2)),
+    ((4.5, 2.2), (7.5, 2.2)),
+    ((4.5, 2.2), (3.0, 4.79)),
+    ((3.0, 4.79), (4.5, 7.39)),
+    ((4.5, 7.39), (7.5, 7.39)),
+    ((4.5, 7.39), (4.15, 8.0)),
+    ((4.15, 8.0), (7.85, 8.0)),
+    ((4.15, 8.0), (0.0, 8.0)),
+    ((0.0, 8.0), (0.0, 4.79)),
+    ((0.0, 4.79), (3.0, 4.79)),
+    ((0.0, 4.79), (0.0, 0.0)),
+    ((0.0, 0.0), (3.23, 0.0)),
 ]
 
-# 生成欧拉路径或回路
-eulerian_path = main(edges)
-for u, v in eulerian_path:
-    print(f'{u} -> {v}')
+# 构建图
+graph = build_graph(edges)
+
+# 调整图以满足欧拉路径条件
+graph = make_eulerian(graph, edges)
+
+# 生成欧拉路径
+euler_path = eulerian_path(graph)
+
+# 输出结果
+if euler_path:
+    print("欧拉路径为:")
+    for i in range(len(euler_path) - 1):
+        print(f"{euler_path[i]} -> {euler_path[i + 1]}")
+else:
+    print("不存在欧拉路径")
